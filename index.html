@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Facet</title>
+<meta name="description" content="A software 3D rasteriser. No WebGL, no GPU. Matrices, near-plane clipping, a z-buffer and perspective-correct interpolation, all in JavaScript." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700&family=Inter+Tight:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#04070d; --panel:#080d17; --line:#121c2c; --line2:#1d2b42;
+  --ink:#dce7f5; --sub:#7d8ca3; --dim:#455468;
+  --cy:#35e0ff; --am:#ffb038; --mg:#ff4d8d;
+  --d:"Oxanium",system-ui,sans-serif;
+  --b:"Inter Tight",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:var(--b);font-size:13px;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+.top{display:flex;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--line2);flex:none;flex-wrap:wrap}
+.brand{font-family:var(--d);font-weight:700;font-size:19px;letter-spacing:.08em;text-transform:uppercase}
+.brand i{color:var(--cy);font-style:normal}
+.tagline{font-size:12px;color:var(--sub);max-width:46ch}
+.pill{margin-left:auto;font-family:var(--d);font-size:10.5px;letter-spacing:.2em;color:var(--cy);border:1px solid var(--line2);padding:6px 11px;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
+
+.main{flex:1;display:flex;min-height:0}
+.stage{flex:1;position:relative;background:#000;overflow:hidden}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated;cursor:grab;touch-action:none}
+canvas.drag{cursor:grabbing}
+.hud{position:absolute;left:14px;top:12px;font-family:var(--d);font-size:10.5px;letter-spacing:.1em;color:var(--dim);line-height:1.95;pointer-events:none}
+.hud b{color:var(--cy);font-weight:500}
+.tip{position:absolute;left:14px;bottom:12px;font-size:11px;color:var(--dim);letter-spacing:.04em}
+
+.side{width:250px;flex:none;border-left:1px solid var(--line2);background:var(--panel);overflow:auto}
+.sh{padding:9px 13px;border-bottom:1px solid var(--line);font-family:var(--d);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.sb{padding:12px 13px;border-bottom:1px solid var(--line)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+button{font-family:var(--d);font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);
+  background:#0c1422;border:1px solid var(--line2);padding:8px 6px;cursor:pointer;
+  clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px)}
+button:hover{color:var(--ink);border-color:var(--cy)}
+button.on{background:var(--cy);color:#04070d;border-color:var(--cy);font-weight:700}
+.ctl{margin-bottom:11px}
+.ctl label{display:flex;justify-content:space-between;font-family:var(--d);font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--dim);margin-bottom:5px}
+.ctl label b{color:var(--am);font-weight:600}
+input[type=range]{width:100%;accent-color:var(--cy);background:transparent;height:14px}
+.toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub);padding:4px 0;cursor:pointer}
+.toggle input{accent-color:var(--cy)}
+.kv{display:flex;justify-content:space-between;font-family:var(--d);font-size:11px;color:var(--dim);padding:3px 0;letter-spacing:.06em}
+.kv b{color:var(--ink);font-weight:500}
+.foot{padding:12px 13px;font-size:11px;color:var(--dim);line-height:1.8}
+.foot a{color:var(--sub)}
+@media(max-width:860px){.side{display:none}}
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="brand">FA<i>CET</i></span>
+  <span class="tagline">A software 3D rasteriser. No WebGL and no GPU — matrices, clipping, a z-buffer and perspective-correct interpolation, every pixel written by JavaScript.</span>
+  <span class="pill">CPU ONLY</span>
+</div>
+
+<div class="main">
+  <div class="stage">
+    <canvas id="c"></canvas>
+    <div class="hud" id="hud"></div>
+    <div class="tip">drag to orbit · scroll to dolly · shift drag to pan the light</div>
+  </div>
+  <aside class="side">
+    <div class="sh">Mesh</div>
+    <div class="sb grid2" id="meshes"></div>
+    <div class="sh">Shading</div>
+    <div class="sb grid2" id="shades"></div>
+    <div class="sh">Pipeline</div>
+    <div class="sb">
+      <label class="toggle"><input type="checkbox" id="cull" checked> backface culling</label>
+      <label class="toggle"><input type="checkbox" id="zbuf" checked> depth test</label>
+      <label class="toggle"><input type="checkbox" id="tex" checked> checker texture</label>
+      <label class="toggle"><input type="checkbox" id="spin" checked> rotate</label>
+      <label class="toggle"><input type="checkbox" id="wire"> wireframe overlay</label>
+    </div>
+    <div class="sh">Settings</div>
+    <div class="sb">
+      <div class="ctl"><label>Resolution <b id="res-v">0.55</b></label><input type="range" id="res" min="0.2" max="1" step="0.05" value="0.55"></div>
+      <div class="ctl"><label>Field of view <b id="fov-v">55°</b></label><input type="range" id="fov" min="25" max="100" step="1" value="55"></div>
+      <div class="ctl"><label>Subdivision <b id="sub-v">24</b></label><input type="range" id="sub" min="6" max="48" step="2" value="24"></div>
+      <div class="ctl" style="margin-bottom:0"><label>Specular <b id="spc-v">28</b></label><input type="range" id="spc" min="1" max="120" step="1" value="28"></div>
+    </div>
+    <div class="sh">Frame</div>
+    <div class="sb">
+      <div class="kv"><span>triangles</span><b id="k-tris">0</b></div>
+      <div class="kv"><span>backface culled</span><b id="k-cull">0</b></div>
+      <div class="kv"><span>near clipped</span><b id="k-clip">0</b></div>
+      <div class="kv"><span>fragments</span><b id="k-frag">0</b></div>
+      <div class="kv"><span>depth rejected</span><b id="k-rej">0</b></div>
+      <div class="kv"><span>raster</span><b id="k-ms">0 ms</b></div>
+      <div class="kv"><span>buffer</span><b id="k-buf">—</b></div>
+    </div>
+    <div class="foot">
+      Built by <a href="https://bxzex.com">bxzex</a>. Every triangle is clipped, projected and filled by hand.
+      <a href="https://github.com/bxzex/facet">Source</a>.
+    </div>
+  </aside>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const cv = $("c"), ctx = cv.getContext("2d");
+
+/* ---------- 4x4 matrices, column vectors, row-major storage ---------- */
+function ident(){ return [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]; }
+function mul(a,b){
+  const o = new Array(16);
+  for(let r=0;r<4;r++) for(let c=0;c<4;c++){
+    let s = 0;
+    for(let k=0;k<4;k++) s += a[r*4+k]*b[k*4+c];
+    o[r*4+c] = s;
+  }
+  return o;
+}
+function perspective(fovDeg, aspect, near, far){
+  const f = 1/Math.tan(fovDeg*Math.PI/360);
+  return [ f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)/(near-far),(2*far*near)/(near-far), 0,0,-1,0 ];
+}
+function lookAt(eye, at, up){
+  const z = norm(subv(eye,at)), x = norm(cross(up,z)), y = cross(z,x);
+  return [ x[0],x[1],x[2],-dot(x,eye),
+           y[0],y[1],y[2],-dot(y,eye),
+           z[0],z[1],z[2],-dot(z,eye),
+           0,0,0,1 ];
+}
+function rotY(a){ const c=Math.cos(a),s=Math.sin(a); return [c,0,s,0, 0,1,0,0, -s,0,c,0, 0,0,0,1]; }
+function rotX(a){ const c=Math.cos(a),s=Math.sin(a); return [1,0,0,0, 0,c,-s,0, 0,s,c,0, 0,0,0,1]; }
+function xform(m,v){
+  return [ m[0]*v[0]+m[1]*v[1]+m[2]*v[2]+m[3]*(v[3]===undefined?1:v[3]),
+           m[4]*v[0]+m[5]*v[1]+m[6]*v[2]+m[7]*(v[3]===undefined?1:v[3]),
+           m[8]*v[0]+m[9]*v[1]+m[10]*v[2]+m[11]*(v[3]===undefined?1:v[3]),
+           m[12]*v[0]+m[13]*v[1]+m[14]*v[2]+m[15]*(v[3]===undefined?1:v[3]) ];
+}
+const subv=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+const norm=a=>{ const l=Math.hypot(a[0],a[1],a[2])||1; return [a[0]/l,a[1]/l,a[2]/l]; };
+
+/* ---------- meshes: positions, normals, uvs, triangle indices ---------- */
+function buildSphere(n){
+  const P=[],N=[],U=[],I=[];
+  const rings = n, seg = n*2;
+  for(let i=0;i<=rings;i++){
+    const phi = i/rings*Math.PI;
+    for(let j=0;j<=seg;j++){
+      const th = j/seg*Math.PI*2;
+      const x = Math.sin(phi)*Math.cos(th), y = Math.cos(phi), z = Math.sin(phi)*Math.sin(th);
+      P.push([x,y,z]); N.push([x,y,z]); U.push([j/seg*3, i/rings*2]);
+    }
+  }
+  for(let i=0;i<rings;i++) for(let j=0;j<seg;j++){
+    const a = i*(seg+1)+j, b = a+seg+1;
+    I.push([a,b,a+1],[b,b+1,a+1]);
+  }
+  return {P,N,U,I};
+}
+function buildTorus(n){
+  const P=[],N=[],U=[],I=[];
+  const R=1, r=0.42, ring=n, side=Math.max(6,Math.round(n*0.6));
+  for(let i=0;i<=ring;i++){
+    const u = i/ring*Math.PI*2;
+    for(let j=0;j<=side;j++){
+      const v = j/side*Math.PI*2;
+      const cx = Math.cos(u)*R, cz = Math.sin(u)*R;
+      const x = (R + r*Math.cos(v))*Math.cos(u);
+      const y = r*Math.sin(v);
+      const z = (R + r*Math.cos(v))*Math.sin(u);
+      P.push([x,y,z]); N.push(norm([x-cx, y, z-cz])); U.push([i/ring*6, j/side*2]);
+    }
+  }
+  for(let i=0;i<ring;i++) for(let j=0;j<side;j++){
+    const a = i*(side+1)+j, b = a+side+1;
+    I.push([a,b,a+1],[b,b+1,a+1]);
+  }
+  return {P,N,U,I};
+}
+function buildCube(){
+  const P=[],N=[],U=[],I=[];
+  const faces = [
+    [[1,0,0],[[1,-1,-1],[1,-1,1],[1,1,1],[1,1,-1]]],
+    [[-1,0,0],[[-1,-1,1],[-1,-1,-1],[-1,1,-1],[-1,1,1]]],
+    [[0,1,0],[[-1,1,-1],[1,1,-1],[1,1,1],[-1,1,1]]],
+    [[0,-1,0],[[-1,-1,1],[1,-1,1],[1,-1,-1],[-1,-1,-1]]],
+    [[0,0,1],[[-1,-1,1],[-1,1,1],[1,1,1],[1,-1,1]]],
+    [[0,0,-1],[[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,-1]]],
+  ];
+  faces.forEach(([n,q]) => {
+    const base = P.length;
+    q.forEach((p,i) => { P.push(p); N.push(n); U.push([[0,0],[0,2],[2,2],[2,0]][i]); });
+    I.push([base,base+1,base+2],[base,base+2,base+3]);
+  });
+  return {P,N,U,I};
+}
+function buildTerrain(n){
+  const P=[],N=[],U=[],I=[];
+  const size = n;
+  const h = (x,z) => 0.42*Math.sin(x*1.7)*Math.cos(z*1.9) + 0.22*Math.sin(x*3.9+1.3)*Math.sin(z*3.1);
+  for(let i=0;i<=size;i++) for(let j=0;j<=size;j++){
+    const x = (i/size-0.5)*3.2, z = (j/size-0.5)*3.2;
+    P.push([x, h(x,z)-0.25, z]);
+    const e = 0.01;
+    const nx = h(x-e,z)-h(x+e,z), nz = h(x,z-e)-h(x,z+e);
+    N.push(norm([nx, 2*e, nz]));
+    U.push([i/size*5, j/size*5]);
+  }
+  for(let i=0;i<size;i++) for(let j=0;j<size;j++){
+    // wound the other way round from the swept meshes: this grid is laid out
+    // in x and z, so the same index order would face away from the camera
+    const a = i*(size+1)+j, b = a+size+1;
+    I.push([a,a+1,b],[b,a+1,b+1]);
+  }
+  return {P,N,U,I};
+}
+function buildLathe(n){
+  // a turned profile, the classic way to make a vase with no model file
+  const P=[],N=[],U=[],I=[];
+  const seg = n*2, steps = n;
+  const prof = t => {
+    const y = t*2 - 1;
+    const r = 0.30 + 0.48*Math.sin(t*Math.PI*0.98 + 0.12) + 0.14*Math.sin(t*Math.PI*3.1);
+    return [Math.max(0.06,r), y];
+  };
+  for(let i=0;i<=steps;i++){
+    const [r,y] = prof(i/steps);
+    const [r2] = prof(Math.min(1,(i+0.5)/steps));
+    const dr = (r2-r), dy = (1/steps)*2;
+    for(let j=0;j<=seg;j++){
+      const th = j/seg*Math.PI*2, c = Math.cos(th), s = Math.sin(th);
+      P.push([r*c, y, r*s]);
+      N.push(norm([c*dy, -dr, s*dy]));
+      U.push([j/seg*4, i/steps*2]);
+    }
+  }
+  for(let i=0;i<steps;i++) for(let j=0;j<seg;j++){
+    const a = i*(seg+1)+j, b = a+seg+1;
+    I.push([a,b,a+1],[b,b+1,a+1]);
+  }
+  return {P,N,U,I};
+}
+const MESHES = { Sphere:buildSphere, Torus:buildTorus, Cube:n=>buildCube(), Terrain:buildTerrain, Vase:buildLathe };
+let meshName = "Vase", mesh = null;
+function rebuild(){ const n = +$("sub").value; mesh = MESHES[meshName](meshName === "Cube" ? 1 : n); }
+
+/* ---------- state ---------- */
+let W=0, H=0, img=null, buf=null, zbuf=null;
+let theta = 0.7, phi = 1.16, dist = 4.2, spinA = 0;
+let light = norm([0.5, 0.75, 0.62]);
+let shading = "Phong";
+
+function resize(){
+  const r = cv.parentElement.getBoundingClientRect();
+  const s = +$("res").value;
+  W = Math.max(64, Math.round(r.width*s));
+  H = Math.max(64, Math.round(r.height*s));
+  cv.width = W; cv.height = H;
+  cv.style.width = r.width+"px"; cv.style.height = r.height+"px";
+  img = ctx.createImageData(W,H);
+  buf = img.data;
+  zbuf = new Float32Array(W*H);
+  $("k-buf").textContent = W+"×"+H;
+}
+
+/* =====================================================================
+   Near plane clipping in clip space. A triangle with any vertex behind
+   the eye cannot simply be divided by w — the result wraps around and
+   smears across the screen — so it is clipped against w > epsilon first
+   and re-triangulated as a fan.
+   ===================================================================== */
+function clipNear(poly){
+  const EPS = 1e-4, out = [];
+  for(let i=0;i<poly.length;i++){
+    const a = poly[i], b = poly[(i+1)%poly.length];
+    const da = a.clip[3] - EPS, db = b.clip[3] - EPS;
+    if(da >= 0) out.push(a);
+    if((da >= 0) !== (db >= 0)){
+      const t = da/(da-db);
+      out.push(lerpVert(a,b,t));
+    }
+  }
+  return out;
+}
+function lerpVert(a,b,t){
+  const L = (x,y) => x + (y-x)*t;
+  return {
+    clip: [L(a.clip[0],b.clip[0]), L(a.clip[1],b.clip[1]), L(a.clip[2],b.clip[2]), L(a.clip[3],b.clip[3])],
+    world:[L(a.world[0],b.world[0]), L(a.world[1],b.world[1]), L(a.world[2],b.world[2])],
+    n:    [L(a.n[0],b.n[0]), L(a.n[1],b.n[1]), L(a.n[2],b.n[2])],
+    uv:   [L(a.uv[0],b.uv[0]), L(a.uv[1],b.uv[1])],
+  };
+}
+
+const BASE = [0.36, 0.72, 0.92];
+function checker(u,v){
+  const c = ((Math.floor(u) + Math.floor(v)) & 1) ? 1 : 0.52;
+  return c;
+}
+function shade(world, n, uv, viewDir){
+  const useTex = $("tex").checked;
+  const k = useTex ? checker(uv[0], uv[1]) : 1;
+  if(shading === "Normals") return [ (n[0]*0.5+0.5), (n[1]*0.5+0.5), (n[2]*0.5+0.5) ];
+  if(shading === "Depth") return null;
+  const nl = Math.max(0, dot(n, light));
+  const amb = 0.16;
+  let spec = 0;
+  if(shading === "Phong"){
+    const h = norm([light[0]+viewDir[0], light[1]+viewDir[1], light[2]+viewDir[2]]);
+    spec = Math.pow(Math.max(0, dot(n,h)), +$("spc").value);
+  }
+  const d = amb + nl*0.92;
+  return [ Math.min(1, BASE[0]*d*k + spec*0.85),
+           Math.min(1, BASE[1]*d*k + spec*0.85),
+           Math.min(1, BASE[2]*d*k + spec*0.9) ];
+}
+
+let stats = { tris:0, cull:0, clip:0, frag:0, rej:0, ms:0 };
+function render(){
+  const t0 = performance.now();
+  buf.fill(0);
+  for(let i=0;i<W*H;i++){
+    zbuf[i] = Infinity;
+    const y = (i/W)|0;
+    const g = 8 + Math.round(16*(1 - y/H));
+    const o = i*4;
+    buf[o] = g*0.5; buf[o+1] = g*0.8; buf[o+2] = g*1.4; buf[o+3] = 255;
+  }
+  stats = { tris:0, cull:0, clip:0, frag:0, rej:0, ms:0 };
+
+  const eye = [ Math.sin(phi)*Math.cos(theta)*dist, Math.cos(phi)*dist, Math.sin(phi)*Math.sin(theta)*dist ];
+  const view = lookAt(eye, [0,0,0], [0,1,0]);
+  const proj = perspective(+$("fov").value, W/H, 0.1, 100);
+  const model = mul(rotY(spinA), rotX(0));
+  const mvp = mul(proj, mul(view, model));
+
+  const doCull = $("cull").checked, doZ = $("zbuf").checked;
+  const { P, N, U, I } = mesh;
+  const wireSegs = [];
+
+  for(const tri of I){
+    stats.tris++;
+    let verts = tri.map(idx => {
+      const wp = xform(model, P[idx]);
+      const wn = xform(model, [N[idx][0],N[idx][1],N[idx][2],0]);
+      return { clip: xform(mvp, P[idx]), world:[wp[0],wp[1],wp[2]], n:[wn[0],wn[1],wn[2]], uv:U[idx] };
+    });
+
+    if(verts.some(v => v.clip[3] <= 1e-4)){
+      verts = clipNear(verts);
+      if(verts.length < 3){ stats.clip++; continue; }
+      stats.clip++;
+    }
+    // fan the (possibly clipped) polygon back into triangles
+    for(let f=1; f+1<verts.length; f++){
+      const poly = [verts[0], verts[f], verts[f+1]];
+      const sp = poly.map(v => {
+        const iw = 1/v.clip[3];
+        return { x:(v.clip[0]*iw*0.5+0.5)*W, y:(1-(v.clip[1]*iw*0.5+0.5))*H, z:v.clip[2]*iw, iw, v };
+      });
+      const area = (sp[1].x-sp[0].x)*(sp[2].y-sp[0].y) - (sp[2].x-sp[0].x)*(sp[1].y-sp[0].y);
+      if(doCull && area >= 0){ stats.cull++; continue; }
+      if(Math.abs(area) < 1e-9) continue;
+      rasterise(sp, area, eye, doZ);
+      if($("wire").checked) wireSegs.push(sp);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  if(wireSegs.length){
+    ctx.strokeStyle = "rgba(53,224,255,.55)"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for(const s of wireSegs){
+      ctx.moveTo(s[0].x, s[0].y); ctx.lineTo(s[1].x, s[1].y); ctx.lineTo(s[2].x, s[2].y); ctx.closePath();
+    }
+    ctx.stroke();
+  }
+  stats.ms = performance.now()-t0;
+  $("k-tris").textContent = stats.tris.toLocaleString();
+  $("k-cull").textContent = stats.cull.toLocaleString();
+  $("k-clip").textContent = stats.clip.toLocaleString();
+  $("k-frag").textContent = stats.frag.toLocaleString();
+  $("k-rej").textContent = stats.rej.toLocaleString();
+  $("k-ms").textContent = stats.ms.toFixed(1)+" ms";
+  $("hud").innerHTML = "MESH <b>"+meshName.toUpperCase()+"</b><br>SHADING <b>"+shading.toUpperCase()+
+    "</b><br>PIPELINE <b>CPU</b><br>BUFFER <b>"+W+"×"+H+"</b>";
+}
+
+/* ---------- the rasteriser: edge functions, barycentrics, 1/w lerp ---------- */
+function rasterise(sp, area, eye, doZ){
+  const minX = Math.max(0, Math.floor(Math.min(sp[0].x, sp[1].x, sp[2].x)));
+  const maxX = Math.min(W-1, Math.ceil(Math.max(sp[0].x, sp[1].x, sp[2].x)));
+  const minY = Math.max(0, Math.floor(Math.min(sp[0].y, sp[1].y, sp[2].y)));
+  const maxY = Math.min(H-1, Math.ceil(Math.max(sp[0].y, sp[1].y, sp[2].y)));
+  if(maxX < minX || maxY < minY) return;
+  const inv = 1/area;
+  const [A,B,C] = sp;
+
+  for(let y=minY; y<=maxY; y++){
+    const py = y + 0.5;
+    for(let x=minX; x<=maxX; x++){
+      const px = x + 0.5;
+      // edge functions give the barycentric weights directly
+      let w0 = ((B.x-A.x)*(py-A.y) - (px-A.x)*(B.y-A.y)) * inv;
+      let w1 = ((C.x-B.x)*(py-B.y) - (px-B.x)*(C.y-B.y)) * inv;
+      let w2 = 1 - w0 - w1;
+      const t = w0; w0 = w1; w1 = w2; w2 = t;      // reorder to match A,B,C
+      if(w0 < 0 || w1 < 0 || w2 < 0) continue;
+
+      const idx = y*W + x;
+      const z = w0*A.z + w1*B.z + w2*C.z;
+      if(doZ && z >= zbuf[idx]){ stats.rej++; continue; }
+
+      // perspective correction: interpolate attribute/w, then divide by 1/w
+      const iw = w0*A.iw + w1*B.iw + w2*C.iw;
+      const a0 = w0*A.iw/iw, a1 = w1*B.iw/iw, a2 = w2*C.iw/iw;
+
+      let col;
+      if(shading === "Depth"){
+        const d = Math.max(0, Math.min(1, (z+1)/2));
+        const g = Math.pow(1-d, 2.2);
+        col = [g*0.25, g*0.85, g];
+      } else if(shading === "Flat"){
+        const n = norm([
+          a0*A.v.n[0]+a1*B.v.n[0]+a2*C.v.n[0],
+          a0*A.v.n[1]+a1*B.v.n[1]+a2*C.v.n[1],
+          a0*A.v.n[2]+a1*B.v.n[2]+a2*C.v.n[2] ]);
+        const nl = Math.max(0, dot(n, light));
+        const k = $("tex").checked ? checker(a0*A.v.uv[0]+a1*B.v.uv[0]+a2*C.v.uv[0],
+                                             a0*A.v.uv[1]+a1*B.v.uv[1]+a2*C.v.uv[1]) : 1;
+        const d = (0.16 + Math.round(nl*4)/4*0.92)*k;
+        col = [BASE[0]*d, BASE[1]*d, BASE[2]*d];
+      } else {
+        const wx = a0*A.v.world[0]+a1*B.v.world[0]+a2*C.v.world[0];
+        const wy = a0*A.v.world[1]+a1*B.v.world[1]+a2*C.v.world[1];
+        const wz = a0*A.v.world[2]+a1*B.v.world[2]+a2*C.v.world[2];
+        const n = norm([
+          a0*A.v.n[0]+a1*B.v.n[0]+a2*C.v.n[0],
+          a0*A.v.n[1]+a1*B.v.n[1]+a2*C.v.n[1],
+          a0*A.v.n[2]+a1*B.v.n[2]+a2*C.v.n[2] ]);
+        const uv = [ a0*A.v.uv[0]+a1*B.v.uv[0]+a2*C.v.uv[0],
+                     a0*A.v.uv[1]+a1*B.v.uv[1]+a2*C.v.uv[1] ];
+        col = shade([wx,wy,wz], n, uv, norm(subv(eye,[wx,wy,wz])));
+      }
+      if(doZ) zbuf[idx] = z;
+      const o = idx*4;
+      buf[o]   = col[0]*255;
+      buf[o+1] = col[1]*255;
+      buf[o+2] = col[2]*255;
+      buf[o+3] = 255;
+      stats.frag++;
+    }
+  }
+}
+
+/* ---------- controls ---------- */
+const mEl = $("meshes");
+Object.keys(MESHES).forEach(n => {
+  const b = document.createElement("button");
+  b.textContent = n; b.className = n === meshName ? "on" : "";
+  b.onclick = () => { meshName = n; rebuild(); [...mEl.children].forEach(c => c.classList.toggle("on", c===b)); };
+  mEl.appendChild(b);
+});
+const sEl = $("shades");
+["Phong","Lambert","Flat","Normals","Depth"].forEach(n => {
+  const b = document.createElement("button");
+  b.textContent = n; b.className = n === shading ? "on" : "";
+  b.onclick = () => { shading = n; [...sEl.children].forEach(c => c.classList.toggle("on", c===b)); };
+  sEl.appendChild(b);
+});
+$("res").oninput = e => { $("res-v").textContent = (+e.target.value).toFixed(2); resize(); };
+$("fov").oninput = e => $("fov-v").textContent = e.target.value+"°";
+$("sub").oninput = e => { $("sub-v").textContent = e.target.value; rebuild(); };
+$("spc").oninput = e => $("spc-v").textContent = e.target.value;
+
+let drag = null;
+cv.addEventListener("pointerdown", e => { drag = { x:e.clientX, y:e.clientY, shift:e.shiftKey }; cv.setPointerCapture(e.pointerId); cv.classList.add("drag"); });
+cv.addEventListener("pointerup", () => { drag = null; cv.classList.remove("drag"); });
+cv.addEventListener("pointermove", e => {
+  if(!drag) return;
+  const dx = e.clientX-drag.x, dy = e.clientY-drag.y;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if(drag.shift){
+    const a = Math.atan2(light[2], light[0]) + dx*0.01;
+    const el = Math.max(-0.95, Math.min(0.95, light[1] - dy*0.006));
+    const rl = Math.sqrt(Math.max(0.01, 1-el*el));
+    light = norm([Math.cos(a)*rl, el, Math.sin(a)*rl]);
+  } else {
+    theta -= dx*0.007;
+    phi = Math.max(0.12, Math.min(Math.PI-0.12, phi - dy*0.007));
+  }
+});
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  dist = Math.max(1.6, Math.min(14, dist*(1 + Math.sign(e.deltaY)*0.1)));
+}, { passive:false });
+
+let last = performance.now();
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now-last)/1000); last = now;
+  if($("spin").checked) spinA += dt*0.42;
+  render();
+}
+window.addEventListener("resize", resize);
+rebuild(); resize(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
