@@ -7,53 +7,51 @@
 <meta name="description" content="A software 3D rasteriser. No WebGL, no GPU. Matrices, near-plane clipping, a z-buffer and perspective-correct interpolation, all in JavaScript." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700&family=Inter+Tight:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&display=swap" rel="stylesheet" />
 <style>
 :root{
   --bg:#04070d; --panel:#080d17; --line:#121c2c; --line2:#1d2b42;
   --ink:#dce7f5; --sub:#7d8ca3; --dim:#455468;
   --cy:#35e0ff; --am:#ffb038; --mg:#ff4d8d;
-  --d:"Oxanium",system-ui,sans-serif;
-  --b:"Inter Tight",system-ui,sans-serif;
+  --d:"Titillium Web",system-ui,sans-serif;
+  --b:"Titillium Web",system-ui,sans-serif;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden}
-body{background:var(--bg);color:var(--ink);font-family:var(--b);font-size:13px;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--ink);font-family:var(--b);font-size:14px;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
 
 .top{display:flex;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--line2);flex:none;flex-wrap:wrap}
-.brand{font-family:var(--d);font-weight:700;font-size:19px;letter-spacing:-.01em}
-.tagline{font-size:12px;color:var(--sub);max-width:46ch}
+.brand{font-family:var(--d);font-weight:700;font-size:20px}
+.tagline{font-size:13.5px;line-height:1.35;color:var(--sub);max-width:72ch}
 .pill{margin-left:auto;font-family:var(--d);font-size:10.5px;letter-spacing:.2em;color:var(--cy);border:1px solid var(--line2);padding:6px 11px;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
 
 .main{flex:1;display:flex;min-height:0}
 .stage{flex:1;position:relative;background:#000;overflow:hidden}
 canvas{display:block;width:100%;height:100%;image-rendering:pixelated;cursor:grab;touch-action:none}
 canvas.drag{cursor:grabbing}
-.hud{position:absolute;left:14px;top:12px;font-family:var(--d);font-size:10.5px;letter-spacing:.1em;color:var(--dim);line-height:1.95;pointer-events:none}
-.hud b{color:var(--cy);font-weight:500}
-.tip{position:absolute;left:14px;bottom:12px;font-size:11px;color:var(--dim);letter-spacing:.04em}
+.hud{position:absolute;left:14px;top:12px;font-size:13px;color:var(--sub);line-height:1.6;pointer-events:none;font-variant-numeric:tabular-nums}
+.hud b{color:var(--ink);font-weight:400}
+.tip{position:absolute;left:14px;bottom:12px;font-size:13px;color:var(--sub)}
 
 .side{width:250px;flex:none;border-left:1px solid var(--line2);background:var(--panel);overflow:auto}
-.sh{padding:9px 13px;border-bottom:1px solid var(--line);font-family:var(--d);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.sh{padding:9px 13px;border-bottom:1px solid var(--line);font-size:13px;font-weight:600;color:var(--sub)}
 .sb{padding:12px 13px;border-bottom:1px solid var(--line)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:5px}
-button{font-family:var(--d);font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);
-  background:#0c1422;border:1px solid var(--line2);padding:8px 6px;cursor:pointer;
-  clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px)}
+button{font-family:var(--d);font-size:13.5px;color:var(--sub);
+  background:#0c1422;border:1px solid var(--line2);padding:6px 6px;cursor:pointer;border-radius:3px}
 button:hover{color:var(--ink);border-color:var(--cy)}
-button.on{background:var(--cy);color:#04070d;border-color:var(--cy);font-weight:700}
+button.on{background:var(--cy);color:#04070d;border-color:var(--cy);font-weight:600}
 .ctl{margin-bottom:11px}
-.ctl label{display:flex;justify-content:space-between;font-family:var(--d);font-size:10px;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--dim);margin-bottom:5px}
-.ctl label b{color:var(--am);font-weight:600}
+.ctl label{display:flex;justify-content:space-between;font-size:13px;color:var(--sub);margin-bottom:3px}
+.ctl label b{color:var(--ink);font-weight:400;font-variant-numeric:tabular-nums}
 input[type=range]{width:100%;accent-color:var(--cy);background:transparent;height:14px}
-.toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub);padding:4px 0;cursor:pointer}
+.toggle{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--sub);padding:4px 0;cursor:pointer}
 .toggle input{accent-color:var(--cy)}
-.kv{display:flex;justify-content:space-between;font-family:var(--d);font-size:11px;color:var(--dim);padding:3px 0;letter-spacing:.06em}
-.kv b{color:var(--ink);font-weight:500}
-.foot{padding:12px 13px;font-size:11px;color:var(--dim);line-height:1.8}
+.kv{display:flex;justify-content:space-between;font-size:13px;color:var(--sub);padding:2px 0}
+.kv b{color:var(--ink);font-weight:400;font-variant-numeric:tabular-nums}
+.foot{padding:12px 13px;font-size:12.5px;color:var(--sub);line-height:1.6}
 .foot a{color:var(--sub)}
-@media(max-width:860px){.side{display:none}}
+@media(max-width:860px){.main{flex-direction:column}.side{width:auto;height:46%;border-left:0;border-top:1px solid var(--line2)}.tagline{display:none}}
 </style>
 </head>
 <body>
@@ -67,7 +65,7 @@ input[type=range]{width:100%;accent-color:var(--cy);background:transparent;heigh
   <div class="stage">
     <canvas id="c"></canvas>
     <div class="hud" id="hud"></div>
-    <div class="tip">drag to orbit · scroll to dolly · shift drag to pan the light</div>
+    <div class="tip">Drag to orbit, scroll to zoom, shift-drag to move the light</div>
   </div>
   <aside class="side">
     <div class="sh">Mesh</div>
@@ -76,11 +74,11 @@ input[type=range]{width:100%;accent-color:var(--cy);background:transparent;heigh
     <div class="sb grid2" id="shades"></div>
     <div class="sh">Pipeline</div>
     <div class="sb">
-      <label class="toggle"><input type="checkbox" id="cull" checked> backface culling</label>
-      <label class="toggle"><input type="checkbox" id="zbuf" checked> depth test</label>
-      <label class="toggle"><input type="checkbox" id="tex" checked> checker texture</label>
-      <label class="toggle"><input type="checkbox" id="spin" checked> rotate</label>
-      <label class="toggle"><input type="checkbox" id="wire"> wireframe overlay</label>
+      <label class="toggle"><input type="checkbox" id="cull" checked> Backface culling</label>
+      <label class="toggle"><input type="checkbox" id="zbuf" checked> Depth test</label>
+      <label class="toggle"><input type="checkbox" id="tex" checked> Checker texture</label>
+      <label class="toggle"><input type="checkbox" id="spin" checked> Rotate</label>
+      <label class="toggle"><input type="checkbox" id="wire"> Wireframe overlay</label>
     </div>
     <div class="sh">Settings</div>
     <div class="sb">
@@ -91,16 +89,16 @@ input[type=range]{width:100%;accent-color:var(--cy);background:transparent;heigh
     </div>
     <div class="sh">Frame</div>
     <div class="sb">
-      <div class="kv"><span>triangles</span><b id="k-tris">0</b></div>
-      <div class="kv"><span>backface culled</span><b id="k-cull">0</b></div>
-      <div class="kv"><span>near clipped</span><b id="k-clip">0</b></div>
-      <div class="kv"><span>fragments</span><b id="k-frag">0</b></div>
-      <div class="kv"><span>depth rejected</span><b id="k-rej">0</b></div>
-      <div class="kv"><span>raster</span><b id="k-ms">0 ms</b></div>
-      <div class="kv"><span>buffer</span><b id="k-buf">—</b></div>
+      <div class="kv"><span>Triangles</span><b id="k-tris">0</b></div>
+      <div class="kv"><span>Backface culled</span><b id="k-cull">0</b></div>
+      <div class="kv"><span>Near clipped</span><b id="k-clip">0</b></div>
+      <div class="kv"><span>Fragments</span><b id="k-frag">0</b></div>
+      <div class="kv"><span>Depth rejected</span><b id="k-rej">0</b></div>
+      <div class="kv"><span>Raster</span><b id="k-ms">0 ms</b></div>
+      <div class="kv"><span>Buffer</span><b id="k-buf">–</b></div>
     </div>
     <div class="foot">
-      Built by <a href="https://bxzex.com">bxzex</a>. Every triangle is clipped, projected and filled by hand.
+      © 2026 <a href="https://bxzex.com">bxzex</a>. Every triangle is clipped, projected and filled by hand.
       <a href="https://github.com/bxzex/facet">Source</a>.
     </div>
   </aside>
@@ -271,8 +269,8 @@ function resize(){
 
 /* =====================================================================
    Near plane clipping in clip space. A triangle with any vertex behind
-   the eye cannot simply be divided by w — the result wraps around and
-   smears across the screen — so it is clipped against w > epsilon first
+   the eye cannot simply be divided by w: the result wraps around and
+   smears across the screen, so it is clipped against w > epsilon first
    and re-triangulated as a fan.
    ===================================================================== */
 function clipNear(poly){
@@ -388,8 +386,7 @@ function render(){
   $("k-frag").textContent = stats.frag.toLocaleString();
   $("k-rej").textContent = stats.rej.toLocaleString();
   $("k-ms").textContent = stats.ms.toFixed(1)+" ms";
-  $("hud").innerHTML = "MESH <b>"+meshName.toUpperCase()+"</b><br>SHADING <b>"+shading.toUpperCase()+
-    "</b><br>PIPELINE <b>CPU</b><br>BUFFER <b>"+W+"×"+H+"</b>";
+  $("hud").innerHTML = meshName+", "+shading.toLowerCase()+" shading<br><b>"+W+" × "+H+"</b> px, drawn on the CPU";
 }
 
 /* ---------- the rasteriser: edge functions, barycentrics, 1/w lerp ---------- */
